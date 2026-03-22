@@ -1,11 +1,15 @@
 # YouTube Shorts Blocker — Safari Web Extension
 
-Nukes YouTube Shorts from every surface using **post-render DOM deletion**:
-a `MutationObserver` watches for newly inserted nodes and immediately removes
-any Shorts shelf, navigation entry, video card, or chip that appears — before
-your eyes ever land on it.
+I f***ing hate shorts but I love youtube so, needed a way to save my brain 
+and still enjoy youtube. So i built this, the goal is to nukes YouTube Shorts 
+from every surface using a `MutationObserver` watches for newly inserted nodes 
+and immediately removes any Shorts shelf, navigation entry, video card, or 
+chip that appears before your btain ever land on it.
 
 ---
+
+
+Below is AI generated README (don't hate me lol) 
 
 ## How it works
 
@@ -75,10 +79,12 @@ shorts-blocker-extension/
 
 ## What gets removed
 
-- 🏠 **Home page** — Shorts shelf between regular videos
-- 🔍 **Search results** — Shorts video cards
-- 📺 **Sidebar** — "Shorts" navigation link
-- 🎞️ **Related videos** — Any Shorts card in the watch page sidebar
-- 🏷️ **Filter chips** — "Shorts" pill in the home feed filter bar
-- 📱 **Direct URL** — `/shorts/VIDEO_ID` redirected to `/watch?v=VIDEO_ID`
-# shorts-blocker-extension
+- Shorts shelf between regular videos
+-  Shorts video cards
+- "Shorts" navigation link
+- Any Shorts card in the watch page sidebar
+- "Shorts" pill in the home feed filter bar
+- `/shorts/VIDEO_ID` redirected to `/watch?v=VIDEO_ID`
+
+# Author 
+Abdullah Mahmood @ 2026

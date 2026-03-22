@@ -1,119 +1,148 @@
 // ============================================================
-//  YouTube Shorts Blocker — Safari Web Extension
-//  Strategy: post-render DOM deletion via MutationObserver
+//  YouTube Shorts Blocker — Safari Web Extension v2
+//  Supports BOTH mobile (ytm-*) and desktop (ytd-*) YouTube
 // ============================================================
 
-const SHORTS_SELECTORS = [
-  // Shelf / section containers
-  "ytd-rich-shelf-renderer[is-shorts]",
-  "ytd-reel-shelf-renderer",
-  "ytd-shorts",
-  "#shorts-container",
+// ── CSS nuke (fastest possible — hides before paint) ──────────────────────
+const CSS = `
+  /* ---- MOBILE (ytm-*) ---- */
+  ytm-reel-shelf-renderer,
+  ytm-shorts-lockup-view-model,
+  ytm-reel-item-renderer,
+  [data-content-type="shorts"],
+  ytm-rich-shelf-renderer[component-style*="SHORTS"],
+  ytm-pivot-bar-item-renderer[tab-identifier="FEshorts"],
 
-  // Sidebar / guide navigation entry
-  "ytd-guide-entry-renderer a[href='/shorts']",
-  "ytd-mini-guide-entry-renderer a[href='/shorts']",
-
-  // Video cards that link to a /shorts/ URL
-  "ytd-video-renderer a[href*='/shorts/']",
-  "ytd-grid-video-renderer a[href*='/shorts/']",
-  "ytd-rich-item-renderer a[href*='/shorts/']",
-  "ytd-compact-video-renderer a[href*='/shorts/']",
-  "ytd-guide-entry-renderer yt-formatted-string[title='Shorts']",
-  // Chip / filter bar "Shorts" pill
-  "yt-chip-cloud-chip-renderer[chip-style='STYLE_HOME_FILTER'] #text[title='Shorts']",
-];
-
-// Climb up the DOM until we find a "safe" removable container
-function findRemovableParent(el) {
-  const stopTags = new Set(["YTD-APP", "YTD-PAGE-MANAGER", "BODY", "HTML"]);
-  let node = el;
-  while (node && !stopTags.has(node.tagName)) {
-    const tag = node.tagName.toLowerCase();
-    // Top-level item renderers are safe to remove entirely
-    if (
-      tag === "ytd-rich-item-renderer" ||
-      tag === "ytd-grid-video-renderer" ||
-      tag === "ytd-video-renderer" ||
-      tag === "ytd-compact-video-renderer" ||
-      tag === "ytd-reel-shelf-renderer" ||
-      tag === "ytd-rich-shelf-renderer" ||
-      tag === "ytd-guide-entry-renderer" ||
-      tag === "ytd-mini-guide-entry-renderer"
-    ) {
-      return node;
-    }
-    node = node.parentElement;
+  /* ---- DESKTOP (ytd-*) ---- */
+  ytd-reel-shelf-renderer,
+  ytd-rich-shelf-renderer[is-shorts],
+  ytd-shorts,
+  #shorts-container,
+  ytd-guide-entry-renderer:has(a[href="/shorts"]),
+  ytd-mini-guide-entry-renderer:has(a[href="/shorts"]) {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
   }
-  return el; // fallback: remove the matched element itself
+`;
+
+function injectCSS() {
+  if (document.getElementById("__shorts-blocker-css__")) return;
+  const style = document.createElement("style");
+  style.id = "__shorts-blocker-css__";
+  style.textContent = CSS;
+  (document.head || document.documentElement).appendChild(style);
 }
 
-function purgeShorts(root = document) {
-  let removed = 0;
+injectCSS();
 
-  // 1. Selector-based sweep
-  SHORTS_SELECTORS.forEach((selector) => {
+// ── Selectors for DOM removal ─────────────────────────────────────────────
+
+const MOBILE_SELECTORS = [
+  "ytm-reel-shelf-renderer",
+  "ytm-shorts-lockup-view-model",
+  "ytm-reel-item-renderer",
+  "[data-content-type='shorts']",
+  "ytm-pivot-bar-item-renderer[tab-identifier='FEshorts']",
+];
+
+const DESKTOP_SELECTORS = [
+  "ytd-reel-shelf-renderer",
+  "ytd-rich-shelf-renderer[is-shorts]",
+  "ytd-shorts",
+  "#shorts-container",
+  "ytd-guide-entry-renderer a[href='/shorts']",
+  "ytd-mini-guide-entry-renderer a[href='/shorts']",
+  "ytd-rich-item-renderer a[href*='/shorts/']",
+  "ytd-video-renderer a[href*='/shorts/']",
+  "ytd-compact-video-renderer a[href*='/shorts/']",
+];
+
+const ALL_SELECTORS = [...MOBILE_SELECTORS, ...DESKTOP_SELECTORS];
+
+const SAFE_REMOVE_TAGS = new Set([
+  "ytm-reel-shelf-renderer",
+  "ytm-shorts-lockup-view-model",
+  "ytm-reel-item-renderer",
+  "ytm-rich-item-renderer",
+  "ytm-compact-video-renderer",
+  "ytm-video-with-context-renderer",
+  "ytd-rich-item-renderer",
+  "ytd-grid-video-renderer",
+  "ytd-video-renderer",
+  "ytd-compact-video-renderer",
+  "ytd-reel-shelf-renderer",
+  "ytd-rich-shelf-renderer",
+  "ytd-guide-entry-renderer",
+  "ytd-mini-guide-entry-renderer",
+]);
+
+const STOP_TAGS = new Set(["BODY", "HTML", "YTD-APP", "YTM-APP"]);
+
+function findRemovableParent(el) {
+  let node = el;
+  while (node && !STOP_TAGS.has(node.tagName)) {
+    if (SAFE_REMOVE_TAGS.has(node.tagName.toLowerCase())) return node;
+    node = node.parentElement;
+  }
+  return el;
+}
+
+function purgeShorts() {
+  injectCSS();
+
+  ALL_SELECTORS.forEach((sel) => {
     try {
-      root.querySelectorAll(selector).forEach((el) => {
-        const target = findRemovableParent(el);
-        target.remove();
-        removed++;
+      document.querySelectorAll(sel).forEach((el) => {
+        findRemovableParent(el).remove();
       });
     } catch (_) {}
   });
 
-  // 2. Catch any video/reel card whose href contains /shorts/ (belt-and-suspenders)
-  root.querySelectorAll("a[href]").forEach((a) => {
-    if (/^\/shorts\//.test(a.getAttribute("href"))) {
+  document.querySelectorAll("a[href]").forEach((a) => {
+    const href = a.getAttribute("href") || "";
+    if (/^\/?shorts\//.test(href)) {
       const target = findRemovableParent(a);
-      if (target !== document.body) {
-        target.remove();
-        removed++;
-      }
+      if (!STOP_TAGS.has(target.tagName)) target.remove();
     }
   });
 
-  // 3. Hard-redirect: if the user lands ON a Shorts page, send them away
-  if (location.pathname.startsWith("/shorts/")) {
-    const videoId = location.pathname.split("/shorts/")[1]?.split("?")[0];
+  if (location.pathname.startsWith("/shorts")) {
+    const videoId = location.pathname.replace(/^\/shorts\/?/, "").split("?")[0];
     if (videoId) {
-      location.replace(`https://www.youtube.com/watch?v=${videoId}`);
+      location.replace("https://www.youtube.com/watch?v=" + videoId);
     } else {
       location.replace("https://www.youtube.com/");
     }
   }
-
-  return removed;
 }
 
-// ── Initial pass (runs as soon as the script injects) ──────────────────────
 purgeShorts();
 
-// ── MutationObserver: fires on every DOM mutation (post-render deletion) ───
-const observer = new MutationObserver((mutations) => {
-  // Batch: collect all added nodes first, then sweep once
-  let needsSweep = false;
-  for (const mutation of mutations) {
-    if (mutation.addedNodes.length) {
-      needsSweep = true;
-      break;
-    }
+let rafPending = false;
+const observer = new MutationObserver(() => {
+  if (!rafPending) {
+    rafPending = true;
+    requestAnimationFrame(() => {
+      purgeShorts();
+      rafPending = false;
+    });
   }
-  if (needsSweep) purgeShorts();
 });
 
-observer.observe(document.documentElement, {
-  childList: true,
-  subtree: true,
-});
+observer.observe(document.documentElement, { childList: true, subtree: true });
 
-// ── YouTube SPA navigation listener ───────────────────────────────────────
-// YouTube fires this custom event on every client-side page transition
-document.addEventListener("yt-navigate-finish", () => {
-  purgeShorts();
-});
+document.addEventListener("yt-navigate-finish", purgeShorts);
 
-// Fallback: poll for the first 5 s after load (catches lazy hydration)
+let lastPath = location.pathname;
+setInterval(() => {
+  if (location.pathname !== lastPath) {
+    lastPath = location.pathname;
+    purgeShorts();
+  }
+}, 300);
+
 let ticks = 0;
 const poller = setInterval(() => {
   purgeShorts();
