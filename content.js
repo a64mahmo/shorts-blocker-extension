@@ -19,7 +19,7 @@ const SHORTS_SELECTORS = [
   "ytd-grid-video-renderer a[href*='/shorts/']",
   "ytd-rich-item-renderer a[href*='/shorts/']",
   "ytd-compact-video-renderer a[href*='/shorts/']",
-
+  "ytd-guide-entry-renderer yt-formatted-string[title='Shorts']",
   // Chip / filter bar "Shorts" pill
   "yt-chip-cloud-chip-renderer[chip-style='STYLE_HOME_FILTER'] #text[title='Shorts']",
 ];
